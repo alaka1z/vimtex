@@ -14,12 +14,16 @@ let s:compiler = vimtex#compiler#_template#new({
       \ 'name' : 'texpresso',
       \ 'continuous': 1,
       \ 'stdin_pipe': 1,
+      \ 'executable': 'texpresso',
       \ 'options' : [],
       \})
 
 function! s:compiler.__check_requirements() abort dict " {{{1
-  if !executable('texpresso')
-    call vimtex#log#warning('texpresso is not executable!')
+  if !self._is_executable_available()
+    let l:exe = type(self.executable) == v:t_list
+          \ ? self.executable[0]
+          \ : self.executable
+    call vimtex#log#warning(l:exe . ' is not executable')
     let self.enabled = v:false
   endif
 endfunction
@@ -28,13 +32,13 @@ endfunction
 function! s:compiler.__init() abort dict " {{{1
   let self.start = function('s:compiler_start', [self.start])
   let self.stop = function('s:compiler_stop', [self.stop])
-  call add(self.hooks, function('s:texpresso_process_message'))
+  call add(self.hooks, function('s:texpresso_process_message', [self]))
 endfunction
 " }}}1
 
 function! s:compiler.__build_cmd(passed_options) abort dict " {{{1
   let l:options = ['-json', '-lines'] + self.options
-  return 'texpresso ' . join(l:options)
+  return self._get_executable_string() . ' ' . join(l:options)
         \ . (empty(a:passed_options) ? '' : ' ' . trim(a:passed_options))
         \ . ' ' . vimtex#util#shellescape(self.file_info.target_basename)
 endfunction
@@ -58,6 +62,7 @@ function! s:compiler_start(super, ...) abort dict " {{{1
 
   call self.texpresso_theme()
   call self.texpresso_reload()
+  call self.texpresso_send("resume")
 endfunction
 " }}}1
 
@@ -96,14 +101,40 @@ function! s:compiler.texpresso_theme() abort dict " {{{1
 endfunction
 " }}}1
 
-function! s:compiler.texpresso_reload() abort dict " {{{1
+function! s:compiler.texpresso_path(path) abort dict
+  if !has('nvim') || !has_key(self, 'wsl') || empty(self.wsl)
+    return a:path
+  endif
+
+  return luaeval(
+        \ "require('vimtex.compiler.texpresso').path(_A[1], _A[2])",
+        \ [a:path, self.wsl])
+endfunction
+
+function! s:compiler.texpresso_path_from_wsl(path) abort dict
+  if !has('nvim') || !has_key(self, 'wsl') || empty(self.wsl)
+    return a:path
+  endif
+
+  return luaeval(
+        \ "require('vimtex.compiler.texpresso').path_from_wsl(_A[1], _A[2])",
+        \ [a:path, self.wsl])
+endfunction
+
+function! s:compiler.texpresso_reload() abort dict "{{{1
   let l:path = fnamemodify(bufname(), ":p")
-  call self.texpresso_send("open", l:path, s:join_lines(getline(1, '$')))
+  let l:path = self.texpresso_path(l:path)
+
+  call self.texpresso_send(
+        \ "open",
+        \ l:path,
+        \ s:join_lines(getline(1, '$')))
 endfunction
 " }}}1
 
 function! s:compiler.texpresso_synctex_forward() abort dict "{{{1
   let l:path = fnamemodify(bufname(), ":p")
+  let l:path = self.texpresso_path(l:path)
   let l:lnum = getpos('.')[1]
   let l:prev_key = 'texpresso_synctex_forward_previous'
   if has_key(self, l:prev_key) && self[l:prev_key] == [l:path, l:lnum]
@@ -144,17 +175,17 @@ function! s:compiler.texpresso_send(...) abort dict " {{{1
 endfunction
 " }}}1
 
-function! s:texpresso_process_message(json) abort " {{{1
+function! s:texpresso_process_message(compiler, json) abort " {{{1
   for l:json in split(a:json, "\n")
     if !empty(l:json)
-      call s:texpresso_process_message_line(l:json)
+      call s:texpresso_process_message_line(a:compiler, l:json)
     endif
   endfor
 endfunction
 
 " }}}1
 
-function! s:texpresso_process_message_line(json) abort " {{{1
+function! s:texpresso_process_message_line(compiler, json) abort " {{{1
   try
     let l:msg = json_decode(a:json)
   catch
@@ -168,7 +199,7 @@ function! s:texpresso_process_message_line(json) abort " {{{1
   endif
 
   if l:msg[0] ==# 'synctex'
-    let l:path = l:msg[1]
+    let l:path = a:compiler.texpresso_path_from_wsl(l:msg[1])
     let l:lnum = l:msg[2]
     call vimtex#view#inverse_search(l:lnum, l:path)
   elseif l:msg[0] ==# 'truncate-lines'
