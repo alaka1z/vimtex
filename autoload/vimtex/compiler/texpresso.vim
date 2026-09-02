@@ -63,6 +63,8 @@ function! s:compiler_start(super, ...) abort dict " {{{1
 
   call self.texpresso_theme()
   call self.texpresso_reload()
+  unlet! self.texpresso_synctex_forward_previous
+  call self.texpresso_synctex_forward()
 endfunction
 " }}}1
 
