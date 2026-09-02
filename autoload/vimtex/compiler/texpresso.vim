@@ -15,6 +15,7 @@ let s:compiler = vimtex#compiler#_template#new({
       \ 'continuous': 1,
       \ 'stdin_pipe': 1,
       \ 'executable': 'texpresso',
+      \ 'synctex_forward': 1,
       \ 'options' : [],
       \})
 
@@ -119,6 +120,9 @@ endfunction
 " }}}1
 
 function! s:compiler.texpresso_synctex_forward() abort dict "{{{1
+  if !self.synctex_forward
+    return
+  endif
   let l:path = fnamemodify(bufname(), ":p")
   let l:path = self.texpresso_path(l:path)
   let l:lnum = getpos('.')[1]
@@ -130,6 +134,21 @@ function! s:compiler.texpresso_synctex_forward() abort dict "{{{1
   call self.texpresso_send("synctex-forward", l:path, l:lnum)
 endfunction
 " }}}1
+
+function! s:compiler.texpresso_synctex_forward_toggle() abort dict "{{{1
+  let self.synctex_forward = !self.synctex_forward
+
+  call vimtex#log#info(
+        \ 'TeXpresso forward SyncTeX: '
+        \ . (self.synctex_forward ? 'enabled' : 'disabled')
+        \)
+
+  if self.synctex_forward
+    unlet! self.texpresso_synctex_forward_previous
+    call self.texpresso_synctex_forward()
+  endif
+endfunction
+"}}}1
 
 function! s:compiler.texpresso_previous_page() abort dict "{{{1
   call self.texpresso_send("previous-page")
