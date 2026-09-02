@@ -1,4 +1,52 @@
 local M = {}
+local path_cache = {}
+
+function M.path(path, distro)
+  if not distro or distro == "" then
+    return path
+  end
+
+  local key = distro .. "\0" .. path
+
+  if path_cache[key] then
+    return path_cache[key]
+  end
+
+  local name = "VIMTEX_TEXPRESSO_PATH"
+  local wslenv = name .. "/p"
+
+  if vim.env.WSLENV and vim.env.WSLENV ~= "" then
+    wslenv = vim.env.WSLENV .. ":" .. wslenv
+  end
+
+  local result = vim.system({
+    "wsl.exe",
+    "-d",
+    distro,
+    "--",
+    "printenv",
+    name,
+  }, {
+    text = true,
+    env = {
+      [name] = path,
+      WSLENV = wslenv,
+    },
+  }):wait()
+
+  if result.code ~= 0 then
+    return path
+  end
+
+  local translated = vim.trim(result.stdout)
+
+  if translated == "" then
+    return path
+  end
+
+  path_cache[key] = translated
+  return translated
+end
 
 ---Attach a buffer listener that sends incremental changes to TeXpresso.
 ---Returns a function that disables the listener on the next change event.
@@ -14,7 +62,10 @@ function M.attach()
       if not compiler or not compiler.job then
         return
       end
-      local path = vim.api.nvim_buf_get_name(buf)
+      local path = M.path(
+        vim.api.nvim_buf_get_name(buf),
+        compiler.wsl
+      )
       local count = oldlast - first
       local lines = ""
       if first < newlast then

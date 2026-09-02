@@ -14,12 +14,16 @@ let s:compiler = vimtex#compiler#_template#new({
       \ 'name' : 'texpresso',
       \ 'continuous': 1,
       \ 'stdin_pipe': 1,
+      \ 'executable': 'texpresso',
       \ 'options' : [],
       \})
 
 function! s:compiler.__check_requirements() abort dict " {{{1
-  if !executable('texpresso')
-    call vimtex#log#warning('texpresso is not executable!')
+  if !self._is_executable_available()
+    let l:exe = type(self.executable) == v:t_list
+          \ ? self.executable[0]
+          \ : self.executable
+    call vimtex#log#warning(l:exe . ' is not executable')
     let self.enabled = v:false
   endif
 endfunction
@@ -34,7 +38,7 @@ endfunction
 
 function! s:compiler.__build_cmd(passed_options) abort dict " {{{1
   let l:options = ['-json', '-lines'] + self.options
-  return 'texpresso ' . join(l:options)
+  return self._get_executable_string() . ' ' . join(l:options)
         \ . (empty(a:passed_options) ? '' : ' ' . trim(a:passed_options))
         \ . ' ' . vimtex#util#shellescape(self.file_info.target_basename)
 endfunction
@@ -96,8 +100,20 @@ function! s:compiler.texpresso_theme() abort dict " {{{1
 endfunction
 " }}}1
 
-function! s:compiler.texpresso_reload() abort dict " {{{1
+function! s:compiler.texpresso_path(path) abort dict
+  if !has('nvim') || !has_key(self, 'wsl') || empty(self.wsl)
+    return a:path
+  endif
+
+  return luaeval(
+        \ "require('vimtex.compiler.texpresso').path(_A[1], _A[2])",
+        \ [a:path, self.wsl])
+endfunction
+
+function! s:compiler.texpresso_reload() abort dict "{{{1
   let l:path = fnamemodify(bufname(), ":p")
+  let l:path = self.texpresso_path(l:path)
+
   call self.texpresso_send("open", l:path, s:join_lines(getline(1, '$')))
 endfunction
 " }}}1
