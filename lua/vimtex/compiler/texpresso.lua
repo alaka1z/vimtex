@@ -75,6 +75,12 @@ function M.attach()
         ) .. "\n"
       end
       local msg = vim.json.encode { "change-lines", path, first, count, lines }
+      local chan = vim.api.nvim_get_chan_info(compiler.job)
+
+      if vim.tbl_isempty(chan) then
+        return true
+      end
+
       vim.api.nvim_chan_send(compiler.job, msg .. "\n")
     end,
   })
