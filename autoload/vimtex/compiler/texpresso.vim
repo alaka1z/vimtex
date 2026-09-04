@@ -70,7 +70,10 @@ endfunction
 
 function! s:compiler_stop(super, ...) abort dict " {{{1
   call call(a:super, a:000, self)
+  call self.texpresso_cleanup()
+endfunction
 
+function! s:compiler.texpresso_cleanup() abort dict
   if has('nvim') && has_key(self, 'nvim_detach')
     call self.nvim_detach()
     unlet self.nvim_detach
@@ -82,6 +85,13 @@ function! s:compiler_stop(super, ...) abort dict " {{{1
   autocmd! vimtex_compiler_texpresso * <buffer>
 endfunction
 " }}}1
+
+function! vimtex#compiler#texpresso#cleanup() abort
+  if exists('b:vimtex.compiler')
+        \ && has_key(b:vimtex.compiler, 'texpresso_cleanup')
+    call b:vimtex.compiler.texpresso_cleanup()
+  endif
+endfunction
 
 function! s:compiler.texpresso_listener(bufnr, start, end, added, changes) abort dict " {{{1
   let l:path = fnamemodify(bufname(a:bufnr), ":p")
@@ -161,6 +171,11 @@ function! s:compiler.texpresso_next_page() abort dict "{{{1
   call self.texpresso_send("next-page")
 endfunction
 "}}}1
+
+augroup vimtex_compiler_texpresso_cleanup
+  autocmd!
+  autocmd User VimtexEventQuit call vimtex#compiler#texpresso#cleanup()
+augroup END
 
 function! s:compiler.texpresso_send(...) abort dict " {{{1
   if !self.is_running() | return | endif
