@@ -19,6 +19,9 @@ let s:compiler = vimtex#compiler#_template#new({
       \ 'options' : [],
       \})
 
+augroup vimtex_compiler_texpresso
+augroup END
+
 function! s:compiler.__check_requirements() abort dict " {{{1
   if !self._is_executable_available()
     let l:exe = type(self.executable) == v:t_list
