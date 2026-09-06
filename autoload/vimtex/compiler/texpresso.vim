@@ -53,10 +53,17 @@ function! s:compiler_start(super, ...) abort dict " {{{1
 
   augroup vimtex_compiler_texpresso
     autocmd! * <buffer>
-    autocmd CursorMoved <buffer> call b:vimtex.compiler.texpresso_synctex_forward()
-    autocmd ColorScheme <buffer> call b:vimtex.compiler.texpresso_theme()
+    autocmd CursorMoved <buffer>
+          \ if exists('b:vimtex.compiler')
+          \ && has_key(b:vimtex.compiler, 'texpresso_synctex_forward')
+          \ | call b:vimtex.compiler.texpresso_synctex_forward()
+          \ | endif
+    autocmd ColorScheme <buffer>
+          \ if exists('b:vimtex.compiler')
+          \ && has_key(b:vimtex.compiler, 'texpresso_theme')
+          \ | call b:vimtex.compiler.texpresso_theme()
+          \ | endif
   augroup END
-
   if has('nvim')
     let self.nvim_detach = luaeval(
           \ "require('vimtex.compiler.texpresso').attach()")
