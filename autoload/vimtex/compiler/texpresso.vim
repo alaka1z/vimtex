@@ -111,15 +111,25 @@ endfunction
 " }}}1
 
 function! s:compiler.texpresso_theme() abort dict " {{{1
-  let l:normal_id = synIDtrans(hlID('Normal'))
-  let l:fg = synIDattr(l:normal_id, 'fg#')
-  let l:bg = synIDattr(l:normal_id, 'bg#')
+  let l:theme_id = synIDtrans(hlID('ThemeNormal'))
+  let l:fg = synIDattr(l:theme_id, 'fg#')
+  let l:bg = synIDattr(l:theme_id, 'bg#')
+
+  " Fall back to Normal when ThemeNormal is unavailable
+  if l:fg ==# '' || l:bg ==# ''
+    let l:normal_id = synIDtrans(hlID('Normal'))
+    let l:fg = synIDattr(l:normal_id, 'fg#')
+    let l:bg = synIDattr(l:normal_id, 'bg#')
+  endif
 
   if l:fg ==# '' || l:bg ==# ''
     return
   endif
 
-  call self.texpresso_send("theme", s:convert_color(l:bg), s:convert_color(l:fg))
+  call self.texpresso_send(
+        \ "theme",
+        \ s:convert_color(l:bg),
+        \ s:convert_color(l:fg))
 endfunction
 " }}}1
 
