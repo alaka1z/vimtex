@@ -19,9 +19,6 @@ let s:compiler = vimtex#compiler#_template#new({
       \ 'options' : [],
       \})
 
-augroup vimtex_compiler_texpresso
-augroup END
-
 function! s:compiler.__check_requirements() abort dict " {{{1
   if !self._is_executable_available()
     let l:exe = type(self.executable) == v:t_list
@@ -48,21 +45,33 @@ function! s:compiler.__build_cmd(passed_options) abort dict " {{{1
 endfunction
 " }}}1
 
+function! s:texpresso_theme_buffer(bufnr) abort
+  let l:vimtex = getbufvar(a:bufnr, 'vimtex', {})
+
+  if empty(l:vimtex)
+        \ || !has_key(l:vimtex, 'compiler')
+        \ || !has_key(l:vimtex.compiler, 'texpresso_theme')
+    return
+  endif
+
+  call l:vimtex.compiler.texpresso_theme()
+endfunction
+
 function! s:compiler_start(super, ...) abort dict " {{{1
   call call(a:super, a:000, self)
 
-  augroup vimtex_compiler_texpresso
-    autocmd! * <buffer>
+  let self.texpresso_augroup =
+        \ 'vimtex_compiler_texpresso_' . bufnr()
+
+  execute 'augroup ' . self.texpresso_augroup
+    autocmd!
     autocmd CursorMoved <buffer>
           \ if exists('b:vimtex.compiler')
           \ && has_key(b:vimtex.compiler, 'texpresso_synctex_forward')
           \ | call b:vimtex.compiler.texpresso_synctex_forward()
           \ | endif
-    autocmd ColorScheme <buffer>
-          \ if exists('b:vimtex.compiler')
-          \ && has_key(b:vimtex.compiler, 'texpresso_theme')
-          \ | call b:vimtex.compiler.texpresso_theme()
-          \ | endif
+    execute 'autocmd ColorScheme *'
+          \ . ' call <SID>texpresso_theme_buffer(' . bufnr() . ')'
   augroup END
   if has('nvim')
     let self.nvim_detach = luaeval(
@@ -92,7 +101,11 @@ function! s:compiler.texpresso_cleanup() abort dict
     unlet self.listener_id
   endif
 
-  autocmd! vimtex_compiler_texpresso * <buffer>
+  if has_key(self, 'texpresso_augroup')
+    execute 'autocmd! ' . self.texpresso_augroup
+    execute 'augroup! ' . self.texpresso_augroup
+    unlet self.texpresso_augroup
+  endif
 endfunction
 " }}}1
 
